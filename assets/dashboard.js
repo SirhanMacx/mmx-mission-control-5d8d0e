@@ -8,6 +8,7 @@ const DT = {
   content:"#4d9dff", quiz:"#ffc34d", test:"#ff5a6e", crq:"#c98bff", eie:"#ff4d9d",
   mock:"#ff8a3d", project:"#3ddc84", review:"#28e0d4", exam:"#ff2e5b",
   launch:"#8b7dff", closeout:"#8ea0c4",
+  vocab:"#b8e04a", buffer:"#5d6f93",   // ENL-specific day types
 };
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 
@@ -50,8 +51,10 @@ function render(){
   const kev = $("#dKev");
   if (d.key_event){ kev.style.display=""; kev.textContent = "★ "+d.key_event; }
   else kev.style.display="none";
-  // cards
-  $("#cards").innerHTML = card(d, "ap", "AP Psychology ×3", d.ap_psych) + card(d, "g9", "Global 9R + ENL", d.global9);
+  // cards — three preps: AP Psych | Global 9R | Global 9 ENL (separate course)
+  $("#cards").innerHTML = card(d, "ap", "AP Psychology ×3", d.ap_psych)
+    + card(d, "g9", "Global 9R", d.global9)
+    + (d.enl ? card(d, "enl", "Global 9 ENL", d.enl) : "");
   wireCards(d);
   // 3D + scrub
   $("#scrub").value = idx;
@@ -73,7 +76,6 @@ function card(day, prep, name, p){
   const unit = p.unit ? `<div class="unit">${esc(p.unit)}${p.lesson_no?` · Lesson ${p.lesson_no}`:""}</div>` : "";
   const mats = p.materials.map(m=>
     `<li>${esc(m)}<span class="copy" data-copy="${esc(m)}">copy</span></li>`).join("");
-  const enl = (prep==="g9" && p.enl_note) ? `<div class="enl"><b>ENL parallel:</b> ${esc(p.enl_note)}</div>` : "";
   const links = p.links ? `<div class="qlinks">
       <a>${esc(p.links.arcade)}</a><a>${esc(p.links.world)}</a>
       <span class="pathchip" data-copy="${esc(p.links.folder)}" title="copy folder path">📁 copy curriculum path</span>
@@ -93,7 +95,6 @@ function card(day, prep, name, p){
     <div class="sect"><div class="lbl">Google Classroom post</div>
       <div class="post-box"><button class="copybtn" data-postcopy>Copy</button>${esc(p.classroom_post)}</div>
     </div>
-    ${enl}
     ${links}
     <div class="status">${st}</div>
   </div>`;
@@ -124,13 +125,15 @@ function renderWeek(){
     const rec = byDate[ds];
     const isSel = rec && rec._i===idx;
     if (rec){
-      const ac=DT[rec.ap_psych.day_type], gc=DT[rec.global9.day_type];
+      const ac=DT[rec.ap_psych.day_type], gc=DT[rec.global9.day_type],
+            ec=rec.enl?DT[rec.enl.day_type]:"#33405f";
       html += `<div class="wd ${isSel?'sel':''}" data-i="${rec._i}">
         <div class="wdh">${["MON","TUE","WED","THU","FRI"][k]}</div>
         <div class="wdn">${dd.getDate()}</div>
         <div class="bars">
           <div class="bar" style="background:${ac}" title="AP: ${rec.ap_psych.day_type_label}"></div>
-          <div class="bar" style="background:${gc}" title="G9: ${rec.global9.day_type_label}"></div>
+          <div class="bar" style="background:${gc}" title="9R: ${rec.global9.day_type_label}"></div>
+          <div class="bar" style="background:${ec}" title="ENL: ${rec.enl?rec.enl.day_type_label:""}"></div>
         </div>
         ${rec.key_event?`<div class="ev">★ ${esc(rec.key_event.split('(')[0].trim())}</div>`:""}
       </div>`;
@@ -145,8 +148,8 @@ function renderWeek(){
   document.querySelectorAll("#weekstrip .wd[data-i]").forEach(el=>
     el.onclick=()=>jumpTo(+el.getAttribute("data-i")));
   // legend
-  const keys = [["content","Content"],["quiz","Quiz"],["test","Test"],["crq","CRQ"],["eie","EIE"],
-    ["mock","Mock"],["project","Project"],["review","Review"],["exam","Exam"],["launch","Launch"]];
+  const keys = [["content","Content"],["vocab","Vocab"],["quiz","Quiz"],["test","Test"],["crq","CRQ"],["eie","EIE"],
+    ["mock","Mock"],["project","Project"],["review","Review"],["buffer","Buffer"],["exam","Exam"],["launch","Launch"]];
   $("#legend2").innerHTML = keys.map(([k,l])=>
     `<span class="lg"><span class="dot" style="background:${DT[k]}"></span>${l}</span>`).join("");
 }
@@ -203,10 +206,13 @@ function wireUI(){
     if (q.length<2){ sr.classList.remove("open"); return; }
     const hits=[];
     for (const d of DAYS){
-      const hay=(d.ap_psych.title+" "+d.global9.title+" "+(d.global9.topic||"")+" "+
+      const enlTitle = d.enl ? d.enl.title : "";
+      const hay=(d.ap_psych.title+" "+d.global9.title+" "+(d.global9.topic||"")+" "+enlTitle+" "+
                  (d.key_event||"")+" "+d.ap_psych.day_type+" "+d.global9.day_type).toLowerCase();
       if (hay.includes(q)){
-        const which = d.global9.title.toLowerCase().includes(q)||((d.global9.topic||"").toLowerCase().includes(q)) ? d.global9.title : d.ap_psych.title;
+        let which = d.ap_psych.title;
+        if (d.global9.title.toLowerCase().includes(q)||((d.global9.topic||"").toLowerCase().includes(q))) which = d.global9.title;
+        else if (enlTitle.toLowerCase().includes(q)) which = "ENL: "+enlTitle;
         hits.push({i:d._i, date:d.date, t:which});
       }
       if (hits.length>=40) break;
@@ -233,7 +239,8 @@ function printWeek(){
     if (!rec){ rows+=`<div class="pw-day"><h2>${hdr} — no school</h2></div>`; continue; }
     rows += `<div class="pw-day"><h2>${hdr}${rec.key_event?` ★ ${esc(rec.key_event)}`:""}</h2>
       ${pwPrep("AP Psychology ×3", rec.ap_psych)}
-      ${pwPrep("Global 9R + ENL", rec.global9)}</div>`;
+      ${pwPrep("Global 9R", rec.global9)}
+      ${rec.enl?pwPrep("Global 9 ENL", rec.enl):""}</div>`;
   }
   $("#pwSheet").innerHTML = `<h1>Week Plan — Mr. Mac · 2026-27</h1>
     <p class="pwsub">Week of ${MONTHS[monday.getMonth()]} ${monday.getDate()}, ${monday.getFullYear()}</p>${rows}`;

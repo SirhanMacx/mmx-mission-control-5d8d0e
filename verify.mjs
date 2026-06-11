@@ -68,7 +68,8 @@ async function jumpToDate(dateStr){
 const data = await page.evaluate(async ()=>{
   const r = await fetch("data/days.json"); const j = await r.json();
   return j.days.map(d=>({date:d.date, ap:d.ap_psych.title, apT:d.ap_psych.day_type,
-    g9:d.global9.title, g9T:d.global9.day_type, kev:d.key_event}));
+    g9:d.global9.title, g9T:d.global9.day_type,
+    enl:d.enl?d.enl.title:"", enlT:d.enl?d.enl.day_type:"", kev:d.key_event}));
 });
 function idxOf(date){ return data.findIndex(d=>d.date===date); }
 async function gotoIdx(i){
@@ -107,6 +108,41 @@ await page.screenshot({path:SHOTS+"/06_apexam.png"});
 await gotoIdx(idxOf("2027-06-25"));
 ok((await page.textContent("#dKev")).includes("Last day"), "Jun 25 last day key event");
 await page.screenshot({path:SHOTS+"/07_lastday.png"});
+
+// 5b. ENL SPLIT PROOFS — ENL is a separate course, not lockstep with 9R
+// three cards render
+const nCards = await page.$$eval(".cards .card", e=>e.length);
+ok(nCards===3, "day panel renders THREE prep cards (AP | 9R | ENL): "+nCards);
+ok(await page.$(".card.enl")!==null, "ENL card present with its own class/accent");
+
+// Sep 3 2026: ENL = Geography vocab while 9R = its own lesson (the proof of the split)
+await gotoIdx(idxOf("2026-09-03"));
+const sep3enl = await page.$eval(".card.enl h3", e=>e.textContent);
+const sep3g9  = await page.$eval(".card.g9 h3",  e=>e.textContent);
+ok(/Geography/i.test(sep3enl), "Sep 3 ENL = Geography & Vocabulary: '"+sep3enl+"'");
+ok(/World Map from Memory/i.test(sep3g9), "Sep 3 9R = its own lesson: '"+sep3g9+"'");
+ok(sep3enl.trim()!==sep3g9.trim(), "Sep 3 ENL ≠ 9R (not lockstep)");
+await page.screenshot({path:SHOTS+"/09_sep3_split.png"});
+
+// an October day: ENL in RVC while 9R is elsewhere
+await gotoIdx(idxOf("2026-10-05"));
+const oct5enl = await page.$eval(".card.enl h3", e=>e.textContent);
+const oct5unit = await page.$eval(".card.enl .unit", e=>e.textContent);
+const oct5g9 = await page.$eval(".card.g9 h3", e=>e.textContent);
+ok(/Hammurabi/i.test(oct5enl) && /River Valley/i.test(oct5unit),
+   "Oct 5 ENL in RVC (Hammurabi): '"+oct5enl+"' / "+oct5unit);
+ok(!/Hammurabi/i.test(oct5g9), "Oct 5 9R on a different lesson: '"+oct5g9+"'");
+await page.screenshot({path:SHOTS+"/10_oct5_rvc.png"});
+
+// Jun 22 2027: ENL Time Travel presentations
+await gotoIdx(idxOf("2027-06-22"));
+const jun22enl = await page.$eval(".card.enl h3", e=>e.textContent);
+ok(/Time Travel presentations/i.test(jun22enl), "Jun 22 ENL = Time Travel presentations: '"+jun22enl+"'");
+await page.screenshot({path:SHOTS+"/11_jun22_timetravel.png"});
+
+// no lockstep copy anywhere in the UI
+const bodyText = await page.evaluate(()=>document.body.innerText);
+ok(!/lockstep/i.test(bodyText), "no 'lockstep' copy in the UI");
 
 // 6. copy box present
 const hasPost = await page.$(".post-box .copybtn");

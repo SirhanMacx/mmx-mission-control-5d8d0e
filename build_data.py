@@ -1,21 +1,29 @@
 #!/usr/bin/env python3
 """Build data/days.json (one entry per instructional day) for Mr. Mac's Mission Control.
 
-Source of truth: Unified_Daily_Calendar_2026-27.csv (178 instructional days).
-Enriched with: Global 9R V2 lesson folders (Build_Manifest topic match), AP Psych
-day-by-day pacing, day-type classification, materials lists, classroom posts, ENL notes.
+Source of truth: Unified_Daily_Calendar_2026-27_v2.csv (178 instructional days,
+three preps: AP Psych x3 / Global 9R / Global 9 ENL) + the ENL course's own
+calendar (Global_9_ENL_V2/00_Project_Charter/CALENDAR_2026-27_ENL.csv).
+
+NOTE (2026-06-11): Global 9 ENL is a SEPARATE, slower, vocabulary-first course
+on Jon's real 25-26 model — NOT in lockstep with 9R. Each day now carries a
+real `enl` object (own unit/lesson/day-type/posts), replacing the old
+"[ENL: scaffolded]" note on the shared 9R lesson.
 """
 import csv, json, os, re, glob, sys
 from datetime import datetime, date
 
 ROOT = "/Volumes/CURRICULA/Curriculum_Agent_Workspace_2026_2027/06_Generated_Curricula"
-CSV = f"{ROOT}/_Maccarello_Year_Plan_2026-27/Unified_Daily_Calendar_2026-27.csv"
+CSV = f"{ROOT}/_Maccarello_Year_Plan_2026-27/Unified_Daily_Calendar_2026-27_v2.csv"
 G9R = f"{ROOT}/Global_9R_V2"
+ENL_CSV = f"{ROOT}/Global_9_ENL_V2/00_Project_Charter/CALENDAR_2026-27_ENL.csv"
+ENL_DIR = f"{ROOT}/Global_9_ENL_V2"
 OUT = os.path.join(os.path.dirname(__file__), "data", "days.json")
 
 # ---- G9R unit folders -> friendly names + lesson folders indexed by date ----
 G9R_UNITS = {}          # unit_num -> {name, slug_folder}
 G9R_LESSON_BY_DATE = {} # 'YYYY-MM-DD' -> {folder, slug, unit_num, unit_name, topic}
+ENL_BY_DATE = {}        # 'YYYY-MM-DD' -> real ENL day object (filled in main)
 
 def load_g9r():
     for ufolder in sorted(glob.glob(f"{G9R}/Unit_*")):
@@ -89,6 +97,7 @@ DAYTYPE_LABEL = {
     "content":"Content","quiz":"Quiz","test":"Test","crq":"CRQ","eie":"EIE",
     "mock":"Mock","project":"Project","review":"Review","exam":"Exam",
     "launch":"Launch","closeout":"Close-Out",
+    "vocab":"Vocab","buffer":"Buffer",   # ENL-specific day types
 }
 
 # ---- materials per prep+daytype ----
@@ -218,16 +227,186 @@ def classroom_post(prep, title, dtype, unit_label):
                 f"Thank you for a great year.")
     return f"Today: {aim}. Handout attached."
 
-def enl_note(title, dtype):
-    base = ("ENL parallel runs in lockstep with 9R. Hand out the EN-pinyin-中文-ES vocab "
-            "sheet up front; teach slice-first (one chunk at a time, model before release).")
+# =====================================================================
+# Global 9 ENL — the REAL course (separate, slower, vocabulary-first).
+# Source: Global_9_ENL_V2/00_Project_Charter/CALENDAR_2026-27_ENL.csv
+# =====================================================================
+ENL_UNIT_TAG = {
+    "Intro": "ENL Intro",
+    "U1 Geography": "ENL U1 — Geography & Vocabulary",
+    "U2 Paleo-Neo": "ENL U2 — Paleo-Neo",
+    "U3 River Valley Civilizations": "ENL U3 — River Valley Civilizations",
+    "EI thread": "ENL — Enduring Issues thread",
+    "U4 Classical": "ENL U4 — Classical (Greece · Rome · Han)",
+    "U5 Post-Classical": "ENL U5 — Post-Classical",
+    "U6 Renaissance": "ENL U6 — Renaissance",
+    "U7 Age of Exploration": "ENL U7 — Age of Exploration",
+    "U8 Final / EI / Time Travel": "ENL U8 — Final / Time Travel",
+}
+ENL_UNIT_FOLDER = {
+    "Intro": "00_Intro", "U1 Geography": "01_Geography", "U2 Paleo-Neo": "02_Paleo_Neo",
+    "U3 River Valley Civilizations": "03_RVC", "EI thread": "EI_Thread",
+    "U4 Classical": "04_Classical", "U5 Post-Classical": "05_Post_Classical",
+    "U6 Renaissance": "06_Renaissance", "U7 Age of Exploration": "07_Exploration",
+    "U8 Final / EI / Time Travel": "08_Final",
+}
+ENL_PROJECT_WORDS = ("instagram", "poster", "newspaper", "crime scene", "artist",
+                     "aztec dictionary", "time travel", "adventure awaits",
+                     "hero or villain", "presentations", "project")
+
+def enl_classify(slot, fil):
+    t = (slot or "").lower()
+    f = (fil or "").lower()
+    if f.startswith("gap (buffer") or t.startswith("buffer"):
+        return "buffer"
+    if "final exam" in t:
+        return "exam"
+    if any(w in t for w in ENL_PROJECT_WORDS):
+        return "project"
+    if "test" in t or "exam" in t or "assessment" in t:
+        return "test"
+    if "quiz" in t:
+        return "quiz"
+    if "crq" in t:
+        return "crq"
+    if "enduring issue" in t or t.startswith("ei ") or "ei final" in t or "ei document" in t or "identifying an enduring" in t:
+        return "eie"
+    if "review" in t or "catch-up" in t:
+        return "review"
+    if "vocab" in t:
+        return "vocab"
+    if "course launch" in t:
+        return "launch"
+    return "content"
+
+def enl_vocab_hint(slot):
+    """Pull the key words named in the lesson slot, e.g. '(desert/mountain/ocean/island)'."""
+    m = re.search(r"\(([^)]+)\)", slot or "")
+    if m:
+        inner = m.group(1)
+        if not re.search(r"^\s*(MODS|mods|work day|intro)", inner):
+            words = re.split(r"[/,+·]| and ", inner)
+            words = [w.strip() for w in words if w.strip() and len(w.strip()) > 2][:4]
+            if words:
+                return ", ".join(words)
+    return None
+
+def enl_materials(fil, dtype):
+    if dtype == "buffer":
+        return ["No new materials — recycle vocab do-nows, review sheets, _Vocab_Supplements glossaries"]
+    files = [p.strip() for p in re.split(r"\s\+\s", fil or "") if p.strip()]
+    files = [re.sub(r"^GAP \(new:\s*", "", x).rstrip(")") for x in files]
+    mats = files if files else ["See unit _UNIT_PLAN.md for the day's file"]
+    mats.append("[Template] student copy — push/print one per class")
+    return mats
+
+def enl_student_do(slot, dtype):
+    if dtype == "vocab":
+        return ("Define each word with the Britannica dictionary, translate it into YOUR "
+                "first language, then write sentences using the new words.")
     if dtype == "test":
-        return base + " For the test: same content, scaffolded prompts + word bank + extended time."
-    if dtype == "crq" or dtype == "eie":
-        return base + " For writing: sentence frames + the multilingual glossary; grade content, not grammar."
+        return "Take the unit test. Read each question slowly. Use the word bank when given."
+    if dtype == "quiz":
+        return "Take the short quiz. You practiced these words — trust your review sheet."
+    if dtype == "exam":
+        return "Final exam: 20 multiple choice + the Enduring Issues essay. Use your sentence starters."
     if dtype == "review":
-        return base + " Review in the home-language glossary first, then English."
-    return base + f" Today's anchor terms come from: {aim_of(title)}."
+        return "Finish the fill-in-the-blank review sheet with the word bank, then study it."
+    if dtype == "project":
+        return f"Work on the project: {slot}. Follow the directions step by step (Step 1, Step 2, Step 3)."
+    if dtype == "eie":
+        return "Practice Enduring Issues: find the issue in the documents and use the sentence starters to write."
+    if dtype == "crq":
+        return "Read the documents, then answer the CRQ questions. Restate the question in your answer."
+    if dtype == "buffer":
+        return "Catch-up day: finish old work, practice vocabulary, extra reading time."
+    if dtype == "launch":
+        return "Meet the class, review the course outline, and complete the about-you activity."
+    return f"Complete today's reading/notes and the Step 1 / Step 2 / Step 3 tasks: {slot}."
+
+def enl_teacher_do(slot, dtype):
+    if dtype == "vocab":
+        return ("Print the vocab table (Vocabulary | Translate | Definition); model one entry; "
+                "students translate into their own L1. Optional multilingual glossary in _Vocab_Supplements.")
+    if dtype in ("test", "quiz"):
+        return "Print test + key. Read directions aloud slowly; allow the review sheet where your policy says so."
+    if dtype == "exam":
+        return "Print the ENL Final (20 MC + EI documents). Proctor; grade content, not grammar, on the essay."
+    if dtype == "review":
+        return "Print the review sheet (+ key). Fill in the first blanks together, then release."
+    if dtype == "project":
+        return f"Print/post project directions; model an exemplar; conference table-by-table. ({slot})"
+    if dtype == "eie":
+        return "Teach from the EI scaffold: what makes an issue 'enduring', then guided document work."
+    if dtype == "crq":
+        return "Model restate-the-question, then guided CRQ writing with sentence frames."
+    if dtype == "buffer":
+        return "No new prep. Recycle vocab do-nows / review sheets; re-teach what the last exit work showed."
+    return "Prep the deck + Student Copy blank (or the glossed reading). Pre-teach 2-3 hard words, then Step tasks."
+
+def enl_classroom_post(slot, dtype, vocab_hint):
+    vocab = f" Key words today: {vocab_hint}." if vocab_hint else ""
+    if dtype == "vocab":
+        return (f"New vocabulary today: {slot}.{vocab} Use the Britannica dictionary. "
+                "Write the meaning in English AND translate each word into YOUR language. "
+                "Then write your sentences. Ask for help in any language.")
+    if dtype == "test":
+        return (f"Test today: {slot}. Bring a pencil. Read every question slowly. "
+                "You studied the review sheet — you are ready.")
+    if dtype == "quiz":
+        return (f"Short quiz today: {slot}. It is just like the review sheet. Take your time.")
+    if dtype == "exam":
+        return ("Final exam today: 20 questions + the Enduring Issues essay. "
+                "Use your sentence starters. Take your time. You worked hard all year — you are ready.")
+    if dtype == "review":
+        return (f"Review day: {slot}.{vocab} Finish the fill-in-the-blank sheet. "
+                "Use the word bank. Study it tonight.")
+    if dtype == "project":
+        return (f"Project time: {slot}. Read the directions step by step. "
+                "It is OK to ask questions — in English or your language. Be creative!")
+    if dtype == "eie":
+        return ("Enduring Issues today. An enduring issue = a big problem that lasts a long time "
+                "and affects many people. Look at the documents, find the issue, and use the "
+                "sentence starters to write about it.")
+    if dtype == "crq":
+        return (f"Writing practice today: {slot}. Read the documents. Restate the question, "
+                "then answer with evidence. Use your sentence starters.")
+    if dtype == "buffer":
+        return ("Catch-up day. Finish any old work. Practice your vocabulary words. "
+                "Extra reading time. Ask me for help with anything.")
+    if dtype == "launch":
+        return ("Welcome to Global History 9! Today we meet each other and learn how the class works. "
+                "You can use your home language to help you learn — that is a strength.")
+    return (f"Today we learn: {slot}.{vocab} Read slowly, use the word list, and do "
+            "Step 1, Step 2, Step 3. Ask for help in any language.")
+
+def load_enl():
+    """date -> real ENL day object."""
+    out = {}
+    for r in csv.DictReader(open(ENL_CSV)):
+        unit = r["ENL_unit"].strip()
+        slot = r["ENL_lesson_slot"].strip()
+        fil = r["ENL_file_or_GAP"].strip()
+        dtype = enl_classify(slot, fil)
+        vocab = enl_vocab_hint(slot)
+        folder = ENL_UNIT_FOLDER.get(unit, "")
+        out[r["date"]] = {
+            "title": slot,
+            "unit": ENL_UNIT_TAG.get(unit, unit),
+            "file_label": fil if not fil.startswith("GAP (buffer") else "buffer day — recycle materials",
+            "day_type": dtype,
+            "day_type_label": DAYTYPE_LABEL[dtype],
+            "materials": enl_materials(fil, dtype),
+            "student_do": enl_student_do(slot, dtype),
+            "teacher_do": enl_teacher_do(slot, dtype),
+            "classroom_post": enl_classroom_post(slot, dtype, vocab),
+            "links": {
+                "arcade": "Global History — Review Arcade (+ EN/pinyin/中文/ES glossary panel)",
+                "world": "Global 9 3D World (Silk Road / River Valleys)",
+                "folder": f"{ENL_DIR}/{folder}/" if folder else f"{ENL_DIR}/",
+            },
+        }
+    return out
 
 # ---- key date markers ----
 KEY_EVENTS = {
@@ -240,6 +419,8 @@ KEY_EVENTS = {
 
 def main():
     load_g9r()
+    global ENL_BY_DATE
+    ENL_BY_DATE = load_enl()
     rows = list(csv.DictReader(open(CSV)))
     days = []
     mismatches = []
@@ -274,8 +455,8 @@ def main():
                 "folder": f"{ROOT}/AP_Psychology_Synthesis_2026-27/",
             },
         }
-        # Global 9R + ENL
-        g_title = (r["Global_9_9R_and_ENL"] or "").strip()
+        # Global 9R (its own prep — ENL is separate, below)
+        g_title = (r["Global_9R"] or "").strip()
         g_assess = r.get("G9_assessment","")
         g_type = classify(g_title, g_assess, r.get("exam_window",""))
         rec = G9R_LESSON_BY_DATE.get(d)
@@ -311,9 +492,8 @@ def main():
             "day_type_label": DAYTYPE_LABEL[g_type],
             "materials": g9r_materials(rec, g_type),
             "student_do": student_do("g9", g_title, g_type),
-            "teacher_do": teacher_do("g9", g_title, g_type, enl=True),
+            "teacher_do": teacher_do("g9", g_title, g_type),
             "classroom_post": classroom_post("g9", g_title, g_type, g_unit_label or "Unit"),
-            "enl_note": enl_note(g_title, g_type),
             "links": {
                 "arcade": "Global History — Review Arcade",
                 "world": "Global 9 3D World (Silk Road / River Valleys)",
@@ -328,6 +508,7 @@ def main():
             "exam_window": r.get("exam_window",""),
             "ap_psych": ap,
             "global9": g9,
+            "enl": ENL_BY_DATE.get(d),
         })
     # ---------- VALIDATION GATE ----------
     print("="*60)
@@ -376,6 +557,20 @@ def main():
         for m in mismatches[:25]:
             print(f"      {m['date']}: cal='{m['calendar']}' vs folder='{m['folder_slug']}'")
 
+    # ENL coverage: every instructional day has a real ENL object; split-proof days
+    enl_missing = [x['date'] for x in days if not x.get('enl')]
+    print(f"[8] ENL real-course coverage: {n-len(enl_missing)}/{n} (expect {n}/{n}) -> "
+          f"{'PASS' if not enl_missing else 'FAIL'} {enl_missing[:5]}")
+    sep3 = next((x for x in days if x['date']=='2026-09-03'), None)
+    if sep3:
+        s_ok = ('Geography' in sep3['enl']['unit'] and sep3['enl']['title'] != sep3['global9']['title'])
+        print(f"    Sep 3 split proof: ENL='{sep3['enl']['title'][:50]}' vs 9R='{sep3['global9']['title'][:40]}' -> "
+              f"{'PASS' if s_ok else 'FAIL'}")
+    jun22 = next((x for x in days if x['date']=='2027-06-22'), None)
+    if jun22:
+        tt_ok = 'Time Travel' in jun22['enl']['title']
+        print(f"    Jun 22 ENL Time Travel presentations -> {'PASS' if tt_ok else 'FAIL'} ('{jun22['enl']['title']}')")
+
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
     meta = {
         "generated": datetime.now().isoformat(),
@@ -384,6 +579,9 @@ def main():
         "key_events": KEY_EVENTS,
         "g9r_match_rate": round(rate,1),
         "units_g9r": {str(k): v["name"] for k,v in sorted(G9R_UNITS.items())},
+        "enl_model": ("separate vocabulary-first course (Jon's real 25-26 model) — "
+                      "NOT lockstep with 9R; source Global_9_ENL_V2/CALENDAR_2026-27_ENL.csv"),
+        "units_enl": list(ENL_UNIT_TAG.values()),
     }
     json.dump({"meta": meta, "days": days}, open(OUT,"w"), indent=1, ensure_ascii=False)
     print("="*60)
