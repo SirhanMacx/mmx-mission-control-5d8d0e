@@ -1,9 +1,6 @@
 // Mission Control dashboard — the 2D workhorse + glue to the 3D Year Road.
 import { initRoad } from "./road3d.js";
 
-// gate guard
-if (sessionStorage.getItem("mmx_auth") !== "1") location.replace("index.html");
-
 const DT = {
   content:"#4d9dff", quiz:"#ffc34d", test:"#ff5a6e", crq:"#c98bff", eie:"#ff4d9d",
   mock:"#ff8a3d", project:"#3ddc84", review:"#28e0d4", exam:"#ff2e5b",

@@ -11,9 +11,9 @@ and a ready-to-paste Google Classroom post — across all three preps:
 
 ## Open it
 
-1. Go to the Pages URL for this repo.
-2. Enter the passcode: **`macs-mission-2027`**
-3. You're in for the browser session (sessionStorage).
+Go to the Pages URL for this repo — the dashboard loads directly (no gate).
+`index.html` and `dashboard.html` are the same dashboard, so old bookmarks to
+either page keep working.
 
 ## What's inside
 
@@ -33,17 +33,15 @@ and a ready-to-paste Google Classroom post — across all three preps:
 GitHub's free tier cannot serve Pages from a *private* repo, so this is a **public** repo
 with an **unguessable name** plus:
 
-- a **passcode gate** (SHA-256 of the passcode is compared in JS; only the hash is in the
-  code, never the plaintext),
+- an **unlisted URL** — the repo name is random and the site is never linked publicly,
 - `<meta name="robots" content="noindex,nofollow">` on every page and a `robots.txt`
   that disallows all crawlers,
 - **zero student data** anywhere — there is none in the source data, and it stays that way.
   Only "Maccarello" appears.
 
-**This is obscurity + a passcode, NOT encryption.** Anyone who has both this exact URL and
-the passcode can read the dashboard. The hash gate stops casual snooping and the noindex
-keeps it out of search engines — that's the whole security model. Don't put anything
-sensitive (especially student data) in here.
+**This is obscurity, NOT encryption.** Anyone who has this exact URL can read the
+dashboard. The unlisted URL plus noindex keeps it out of search engines — that's the
+whole security model. Don't put anything sensitive (especially student data) in here.
 
 ## Data
 

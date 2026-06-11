@@ -27,24 +27,26 @@ page.on("console", m=>{ if(m.type()==="error") errs.push(m.text()); });
 page.on("pageerror", e=>errs.push("PAGEERROR: "+e.message));
 const ok=(c,m)=>{ console.log((c?"PASS":"FAIL")+" — "+m); if(!c) fails.push(m); };
 
-// 1. gate page loads
+// 1. index IS the dashboard — no gate
 await page.goto(base+"/index.html",{waitUntil:"networkidle"});
-ok(await page.title()==="Mission Control", "gate page title");
-ok(await page.$('meta[content="noindex,nofollow"]')!==null, "gate has noindex meta");
-await page.screenshot({path:SHOTS+"/01_gate.png"});
-
-// 2. wrong passcode rejected
-await page.fill("#pc","wrong-code"); await page.click("button[type=submit]");
-await page.waitForTimeout(300);
-ok((await page.textContent("#err")).includes("Wrong"), "wrong passcode rejected");
-ok(page.url().includes("index.html")||page.url().endsWith("/"), "wrong passcode stays on gate");
-
-// 3. correct passcode enters
-await page.fill("#pc","macs-mission-2027"); await page.click("button[type=submit]");
-await page.waitForURL(/dashboard\.html/,{timeout:5000}).catch(()=>{});
-ok(page.url().includes("dashboard.html"), "correct passcode enters dashboard");
+ok((await page.title()).includes("Mission Control"), "index page title");
+ok(await page.$('meta[content="noindex,nofollow"]')!==null, "index has noindex meta");
+ok(await page.$("#gate")===null && await page.$("#pc")===null, "no passcode gate on index");
+ok(page.url().includes("index.html"), "no redirect away from index");
+ok(await page.$("#road3d")!==null, "index renders the dashboard (Year Road canvas present)");
 await page.waitForTimeout(2500); // let three.js + data load
-await page.screenshot({path:SHOTS+"/02_dashboard.png"});
+await page.screenshot({path:SHOTS+"/01_index_dashboard.png"});
+
+// 2. dashboard.html still works for old bookmarks
+const page2 = await ctx.newPage();
+page2.on("console", m=>{ if(m.type()==="error") errs.push("dash: "+m.text()); });
+page2.on("pageerror", e=>errs.push("dash PAGEERROR: "+e.message));
+await page2.goto(base+"/dashboard.html",{waitUntil:"networkidle"});
+ok(await page2.$("#road3d")!==null, "dashboard.html still serves the dashboard");
+ok(page2.url().includes("dashboard.html"), "dashboard.html does not bounce to a gate");
+await page2.waitForTimeout(1500);
+await page2.screenshot({path:SHOTS+"/02_dashboard.png"});
+await page2.close();
 
 // 4. Year Road renders (canvas has non-trivial pixels)
 const canvasOk = await page.evaluate(()=>{

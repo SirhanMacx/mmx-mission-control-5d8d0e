@@ -4,93 +4,80 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex,nofollow">
-<title>Mission Control</title>
+<title>Mission Control — Mr. Mac 2026-27</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
-<style>
-:root{
-  --navy:#070b18; --navy2:#0d1426; --panel:#111a30; --panel2:#16213d;
-  --line:#22304f; --ink:#e8eefc; --muted:#8ea0c4; --dim:#5d6f93;
-  --cyan:#28e0d4; --cyan-dim:#1aa39a; --magenta:#ff4d9d; --violet:#8b7dff;
-  --amber:#ffc34d; --green:#3ddc84; --red:#ff5a6e;
-}
-*{box-sizing:border-box}
-html,body{margin:0;height:100%}
-body{
-  font-family:Inter,system-ui,sans-serif;background:var(--navy);color:var(--ink);
-  display:flex;align-items:center;justify-content:center;min-height:100vh;
-  background-image:radial-gradient(900px 500px at 50% -10%, rgba(40,224,212,.10), transparent 60%),
-                   radial-gradient(700px 500px at 90% 110%, rgba(139,125,255,.10), transparent 60%);
-  overflow:hidden;
-}
-.stars{position:fixed;inset:0;pointer-events:none;opacity:.5}
-.gate{position:relative;z-index:2;width:min(440px,92vw);background:linear-gradient(180deg,var(--panel),var(--navy2));
-  border:1px solid var(--line);border-radius:18px;padding:38px 34px;
-  box-shadow:0 30px 90px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.04)}
-.badge{font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.22em;color:var(--cyan);
-  text-transform:uppercase;margin:0 0 6px}
-h1{margin:0 0 4px;font-size:30px;font-weight:800;letter-spacing:-.02em;
-  background:linear-gradient(90deg,#fff,var(--cyan));-webkit-background-clip:text;background-clip:text;color:transparent}
-.sub{color:var(--muted);font-size:14px;margin:0 0 26px;line-height:1.5}
-label{display:block;font-size:12px;color:var(--dim);margin:0 0 8px;font-family:'JetBrains Mono',monospace;letter-spacing:.1em;text-transform:uppercase}
-.row{display:flex;gap:10px}
-input{flex:1;background:#0a1124;border:1px solid var(--line);color:var(--ink);
-  border-radius:11px;padding:13px 15px;font-size:16px;font-family:'JetBrains Mono',monospace;outline:none;transition:.15s}
-input:focus{border-color:var(--cyan);box-shadow:0 0 0 3px rgba(40,224,212,.15)}
-button{background:linear-gradient(180deg,var(--cyan),var(--cyan-dim));color:#04201e;border:0;
-  border-radius:11px;padding:0 22px;font-weight:700;font-size:15px;cursor:pointer;transition:.15s}
-button:hover{filter:brightness(1.08)}
-button:active{transform:translateY(1px)}
-.err{color:var(--red);font-size:13px;margin:14px 0 0;min-height:18px;font-weight:500}
-.note{margin:26px 0 0;padding-top:18px;border-top:1px solid var(--line);color:var(--dim);font-size:11.5px;line-height:1.6}
-.note b{color:var(--muted)}
-</style>
+<link rel="stylesheet" href="assets/app.css">
+<script type="importmap">
+{ "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
+</script>
 </head>
 <body>
-<canvas class="stars" id="stars"></canvas>
-<form class="gate" id="gate" autocomplete="off">
-  <p class="badge">// Mr. Mac · 2026–27</p>
-  <h1>Mission Control</h1>
-  <p class="sub">Private teacher-prep dashboard. Enter the passcode to open the year.</p>
-  <label for="pc">Passcode</label>
-  <div class="row">
-    <input id="pc" type="password" placeholder="••••••••••••" autofocus>
-    <button type="submit">Enter</button>
+<header>
+  <div class="brand">Mr. Mac's <span>Mission Control</span></div>
+  <div class="tag">2026–27</div>
+  <div class="spacer"></div>
+  <div class="search">
+    <input id="search" type="text" placeholder="Search: Hammurabi, mock, EIE…" autocomplete="off">
+    <div class="search-res" id="searchRes"></div>
   </div>
-  <p class="err" id="err"></p>
-  <p class="note"><b>Privacy:</b> this is a public GitHub Pages site with an unguessable URL, a passcode
-  gate, and <i>noindex</i>/robots blocking. That's <b>obscurity + a passcode, not encryption</b> — anyone
-  with this exact link and code can read it. No student data lives here, by design.</p>
-</form>
-<script>
-const HASH="a4936e3f152751f126b556d1ec453d7cd7bce8fb75fdc00a4c5d804af39d3253";
-async function sha256(s){
-  const b=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(s));
-  return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,"0")).join("");
-}
-// already authed this session? skip straight in
-if(sessionStorage.getItem("mmx_auth")==="1") location.replace("dashboard.html");
-document.getElementById("gate").addEventListener("submit",async e=>{
-  e.preventDefault();
-  const v=document.getElementById("pc").value;
-  const err=document.getElementById("err");
-  if(!v){err.textContent="Enter the passcode.";return;}
-  if(await sha256(v)===HASH){
-    sessionStorage.setItem("mmx_auth","1");
-    location.replace("dashboard.html");
-  }else{
-    err.textContent="Wrong passcode. Try again.";
-    document.getElementById("pc").value="";
-  }
-});
-// tiny starfield
-const c=document.getElementById("stars"),x=c.getContext("2d");
-function rs(){c.width=innerWidth;c.height=innerHeight;}
-rs();addEventListener("resize",rs);
-const st=[...Array(90)].map(()=>({x:Math.random(),y:Math.random(),r:Math.random()*1.4+.2,a:Math.random()}));
-(function draw(){x.clearRect(0,0,c.width,c.height);for(const s of st){s.a+=.01;
-  x.globalAlpha=.3+.3*Math.sin(s.a);x.fillStyle="#28e0d4";
-  x.beginPath();x.arc(s.x*c.width,s.y*c.height,s.r,0,7);x.fill();}requestAnimationFrame(draw);})();
-</script>
+  <button class="btn solid" id="todayBtn">Today</button>
+  <button class="btn" id="printWeekBtn">Print week</button>
+</header>
+
+<section id="hero">
+  <canvas id="road3d"></canvas>
+  <div class="hero-overlay">
+    <h2>The Year Road</h2>
+    <p id="heroSub">178 instructional days · click a landmark or scrub to jump</p>
+  </div>
+  <div class="hero-legend" id="heroLegend"></div>
+  <div class="scrub">
+    <span class="pos mono" id="scrubPos">Day 1 / 178</span>
+    <input type="range" id="scrub" min="0" max="177" value="0">
+  </div>
+</section>
+
+<div class="wrap">
+  <div class="daybar">
+    <button class="nav" id="prevDay" title="Previous day">‹</button>
+    <button class="nav" id="nextDay" title="Next day">›</button>
+    <div>
+      <span class="date" id="dDate">—</span>
+      <span class="dow" id="dDow"></span>
+    </div>
+    <span class="mp" id="dMp"></span>
+    <span class="keyevent" id="dKev" style="display:none"></span>
+  </div>
+
+  <div class="cards" id="cards"></div>
+
+  <div class="panels">
+    <div class="box">
+      <h4>This Week</h4>
+      <div class="weekstrip" id="weekstrip"></div>
+      <div class="legend2" id="legend2"></div>
+    </div>
+    <div class="box">
+      <h4>Calendar</h4>
+      <div class="cal" id="cal"></div>
+    </div>
+  </div>
+</div>
+
+<!-- print week sheet (hidden until print) -->
+<div class="pw-sheet" id="pwSheet"></div>
+
+<footer>
+  <b>Mr. Mac's Mission Control</b> — private 2026-27 teacher-prep dashboard. 3 preps: AP Psychology ×3 ·
+  Global History 9R · Global 9 ENL (a separate, slower, vocabulary-first course — its own units, tests, and projects).<br>
+  <b>Privacy:</b> public GitHub Pages behind an unlisted, unguessable URL with
+  <i>noindex</i> + robots-disallow. This is obscurity, <b>not encryption</b>. Zero student data — by design.
+  Data built from the Unified Daily Calendar + curriculum manifests on disk.
+</footer>
+
+<div class="toast" id="toast"></div>
+<script type="module" src="assets/road3d.js"></script>
+<script type="module" src="assets/dashboard.js"></script>
 </body>
 </html>
