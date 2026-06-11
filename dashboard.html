@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex,nofollow">
+<title>Mission Control — Mr. Mac 2026-27</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/app.css">
+<script type="importmap">
+{ "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
+</script>
+</head>
+<body>
+<header>
+  <div class="brand">Mr. Mac's <span>Mission Control</span></div>
+  <div class="tag">2026–27</div>
+  <div class="spacer"></div>
+  <div class="search">
+    <input id="search" type="text" placeholder="Search: Hammurabi, mock, EIE…" autocomplete="off">
+    <div class="search-res" id="searchRes"></div>
+  </div>
+  <button class="btn solid" id="todayBtn">Today</button>
+  <button class="btn" id="printWeekBtn">Print week</button>
+</header>
+
+<section id="hero">
+  <canvas id="road3d"></canvas>
+  <div class="hero-overlay">
+    <h2>The Year Road</h2>
+    <p id="heroSub">178 instructional days · click a landmark or scrub to jump</p>
+  </div>
+  <div class="hero-legend" id="heroLegend"></div>
+  <div class="scrub">
+    <span class="pos mono" id="scrubPos">Day 1 / 178</span>
+    <input type="range" id="scrub" min="0" max="177" value="0">
+  </div>
+</section>
+
+<div class="wrap">
+  <div class="daybar">
+    <button class="nav" id="prevDay" title="Previous day">‹</button>
+    <button class="nav" id="nextDay" title="Next day">›</button>
+    <div>
+      <span class="date" id="dDate">—</span>
+      <span class="dow" id="dDow"></span>
+    </div>
+    <span class="mp" id="dMp"></span>
+    <span class="keyevent" id="dKev" style="display:none"></span>
+  </div>
+
+  <div class="cards" id="cards"></div>
+
+  <div class="panels">
+    <div class="box">
+      <h4>This Week</h4>
+      <div class="weekstrip" id="weekstrip"></div>
+      <div class="legend2" id="legend2"></div>
+    </div>
+    <div class="box">
+      <h4>Calendar</h4>
+      <div class="cal" id="cal"></div>
+    </div>
+  </div>
+</div>
+
+<!-- print week sheet (hidden until print) -->
+<div class="pw-sheet" id="pwSheet"></div>
+
+<footer>
+  <b>Mr. Mac's Mission Control</b> — private 2026-27 teacher-prep dashboard. 3 preps: AP Psychology ×3 ·
+  Global History 9R · Global 9 ENL (9R + ENL in lockstep).<br>
+  <b>Privacy:</b> public GitHub Pages, unguessable URL, passcode gate (SHA-256, sessionStorage),
+  <i>noindex</i> + robots-disallow. This is obscurity + a passcode, <b>not encryption</b>. Zero student data — by design.
+  Data built from the Unified Daily Calendar + curriculum manifests on disk.
+</footer>
+
+<div class="toast" id="toast"></div>
+<script type="module" src="assets/road3d.js"></script>
+<script type="module" src="assets/dashboard.js"></script>
+</body>
+</html>

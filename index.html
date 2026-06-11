@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex,nofollow">
+<title>Mission Control</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --navy:#070b18; --navy2:#0d1426; --panel:#111a30; --panel2:#16213d;
+  --line:#22304f; --ink:#e8eefc; --muted:#8ea0c4; --dim:#5d6f93;
+  --cyan:#28e0d4; --cyan-dim:#1aa39a; --magenta:#ff4d9d; --violet:#8b7dff;
+  --amber:#ffc34d; --green:#3ddc84; --red:#ff5a6e;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{
+  font-family:Inter,system-ui,sans-serif;background:var(--navy);color:var(--ink);
+  display:flex;align-items:center;justify-content:center;min-height:100vh;
+  background-image:radial-gradient(900px 500px at 50% -10%, rgba(40,224,212,.10), transparent 60%),
+                   radial-gradient(700px 500px at 90% 110%, rgba(139,125,255,.10), transparent 60%);
+  overflow:hidden;
+}
+.stars{position:fixed;inset:0;pointer-events:none;opacity:.5}
+.gate{position:relative;z-index:2;width:min(440px,92vw);background:linear-gradient(180deg,var(--panel),var(--navy2));
+  border:1px solid var(--line);border-radius:18px;padding:38px 34px;
+  box-shadow:0 30px 90px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.04)}
+.badge{font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.22em;color:var(--cyan);
+  text-transform:uppercase;margin:0 0 6px}
+h1{margin:0 0 4px;font-size:30px;font-weight:800;letter-spacing:-.02em;
+  background:linear-gradient(90deg,#fff,var(--cyan));-webkit-background-clip:text;background-clip:text;color:transparent}
+.sub{color:var(--muted);font-size:14px;margin:0 0 26px;line-height:1.5}
+label{display:block;font-size:12px;color:var(--dim);margin:0 0 8px;font-family:'JetBrains Mono',monospace;letter-spacing:.1em;text-transform:uppercase}
+.row{display:flex;gap:10px}
+input{flex:1;background:#0a1124;border:1px solid var(--line);color:var(--ink);
+  border-radius:11px;padding:13px 15px;font-size:16px;font-family:'JetBrains Mono',monospace;outline:none;transition:.15s}
+input:focus{border-color:var(--cyan);box-shadow:0 0 0 3px rgba(40,224,212,.15)}
+button{background:linear-gradient(180deg,var(--cyan),var(--cyan-dim));color:#04201e;border:0;
+  border-radius:11px;padding:0 22px;font-weight:700;font-size:15px;cursor:pointer;transition:.15s}
+button:hover{filter:brightness(1.08)}
+button:active{transform:translateY(1px)}
+.err{color:var(--red);font-size:13px;margin:14px 0 0;min-height:18px;font-weight:500}
+.note{margin:26px 0 0;padding-top:18px;border-top:1px solid var(--line);color:var(--dim);font-size:11.5px;line-height:1.6}
+.note b{color:var(--muted)}
+</style>
+</head>
+<body>
+<canvas class="stars" id="stars"></canvas>
+<form class="gate" id="gate" autocomplete="off">
+  <p class="badge">// Mr. Mac · 2026–27</p>
+  <h1>Mission Control</h1>
+  <p class="sub">Private teacher-prep dashboard. Enter the passcode to open the year.</p>
+  <label for="pc">Passcode</label>
+  <div class="row">
+    <input id="pc" type="password" placeholder="••••••••••••" autofocus>
+    <button type="submit">Enter</button>
+  </div>
+  <p class="err" id="err"></p>
+  <p class="note"><b>Privacy:</b> this is a public GitHub Pages site with an unguessable URL, a passcode
+  gate, and <i>noindex</i>/robots blocking. That's <b>obscurity + a passcode, not encryption</b> — anyone
+  with this exact link and code can read it. No student data lives here, by design.</p>
+</form>
+<script>
+const HASH="a4936e3f152751f126b556d1ec453d7cd7bce8fb75fdc00a4c5d804af39d3253";
+async function sha256(s){
+  const b=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(s));
+  return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,"0")).join("");
+}
+// already authed this session? skip straight in
+if(sessionStorage.getItem("mmx_auth")==="1") location.replace("dashboard.html");
+document.getElementById("gate").addEventListener("submit",async e=>{
+  e.preventDefault();
+  const v=document.getElementById("pc").value;
+  const err=document.getElementById("err");
+  if(!v){err.textContent="Enter the passcode.";return;}
+  if(await sha256(v)===HASH){
+    sessionStorage.setItem("mmx_auth","1");
+    location.replace("dashboard.html");
+  }else{
+    err.textContent="Wrong passcode. Try again.";
+    document.getElementById("pc").value="";
+  }
+});
+// tiny starfield
+const c=document.getElementById("stars"),x=c.getContext("2d");
+function rs(){c.width=innerWidth;c.height=innerHeight;}
+rs();addEventListener("resize",rs);
+const st=[...Array(90)].map(()=>({x:Math.random(),y:Math.random(),r:Math.random()*1.4+.2,a:Math.random()}));
+(function draw(){x.clearRect(0,0,c.width,c.height);for(const s of st){s.a+=.01;
+  x.globalAlpha=.3+.3*Math.sin(s.a);x.fillStyle="#28e0d4";
+  x.beginPath();x.arc(s.x*c.width,s.y*c.height,s.r,0,7);x.fill();}requestAnimationFrame(draw);})();
+</script>
+</body>
+</html>
